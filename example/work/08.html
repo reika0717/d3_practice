@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="jp">
+<head>
+<style>
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+#btn {
+    display: block;
+}
+
+.bar {
+    color:white;
+    padding-left:0.5em;
+    padding-top: 0.5em;
+    margin-top:4px;
+}
+
+</style>
+
+</head>
+<body>
+<button id="btn">append</button>
+<div id="stage"></div>
+
+
+<script src="//unpkg.com/d3@5.0.0/dist/d3.min.js"></script>
+<script>
+
+var data = [
+    {id:1, value:320},
+    {id:2, value:210},
+    {id:3, value:410},
+    {id:4, value:790},
+    {id:5, value:550},
+    {id:6, value:390},
+]
+
+d3.select("#btn").on("click", render)
+
+function render(){
+
+    d3.csv("data/test.csv").then(function(data){
+
+        var xScale = d3.scaleLinear()
+            .domain([0, d3.max(data, function (data) { return data.value; })])
+            .range([0, 1000]);
+
+        var stage = d3.select("#stage");
+
+        enterDIV = stage.selectAll(".bar")
+            .data(data.sort(function(a,b){ return a.value - b.value; }))
+            .enter()
+            .append("div")
+            .attr("class", "bar")
+
+        enterDIV
+            .style("width", function(d, i){ return xScale(d.value) + "px"})
+            .style("height", "50px")
+            .style("background-color", function (d, i) {
+                if (d.value >= 100) {
+                    return "red";
+                } else {
+                    return "blue";
+                }
+
+            })
+            .text(function(d){ return "id:" + d.id + " value:" + d.value})
+
+        var xAxis = d3.axisBottom(xScale);
+
+        d3.select('body')
+            .append('svg')
+            .attr('height', '100')
+            .attr('width', '1000')
+            .append('g')
+            .call(xAxis)
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>

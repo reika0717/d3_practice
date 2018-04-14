@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Scale Test</title>
+    <style>
+      .x-axis path {
+        stroke: none;
+      }
+      .y-axis path {
+        stroke: none;
+      }
+      .y-axis .tick line {
+        /*stroke-dasharray: 3 5;*/
+        /*stroke-width: 0.5px;*/
+        stroke: #ccc;
+      }
+    </style>
+</head>
+
+<body>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.17.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+    <script type="text/javascript">
+        d3.json("https://script.google.com/a/loftwork.com/macros/s/AKfycbwJFrRvGA-UXA_WiRhJ_y5Zp7BnML_lvAbudioAfsRVxvGyBmM/exec", function(data) {
+
+            /*********************************
+             * Setup Datas
+             *********************************/
+
+            // Setting formatted date text to column 4
+            // 1994-11-05T08:15:30-05:00
+            _.each(data, function(d) {
+                var dates = d[0].split('.');
+                var times = d[1].split('.');
+                d[3] = dates[0] + "-" + dates[1] + "-" + dates[2] + "T" + times[0] + "+09:00";
+                //console.log(d[3]);
+            });
+
+            // Calculation Posts Count by Minutes
+            var summedByMinutes = _.chain(data).groupBy(function(d) {
+                var dDate = new Date(d[3]);
+                var mDate = moment(dDate);
+                mDate.second(0);
+                mDate.milliseconds(0);
+                //dDate.second(0);
+                //dDate.milliseconds(0);
+                return mDate;
+            }).map(function(d) {
+                var tmpDate = moment(d[0][3]);
+                tmpDate.second(0);
+                tmpDate.milliseconds(0);
+                return [tmpDate.toDate(), d.length];
+            }).value();
+
+
+            /*********************************
+             * Defining Scales
+             *********************************/
+
+            var xScale = d3.scaleTime()
+                .domain([new Date(2017, 0, 20, 18, 0), new Date(2017, 0, 20, 20, 0)])
+                .range([0, 5000]);
+
+            var yScale = d3.scaleLinear()
+                .domain([0, 100])
+                .range([0, 350]);
+
+            var colorScale = d3.scaleLinear()
+                .domain([1,100])
+                .interpolate(d3.interpolateHcl)
+                .range([d3.rgb("#007AFF"), d3.rgb('#FFF500')]);
+
+
+            /*********************************
+             * Append SVG element
+             *********************************/
+
+            var svg = d3.select("body")
+                .append("svg")
+                .attr("width", 15000)
+                .attr("height", 610)
+                ;
+
+            // Dots
+            svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d, i) {
+                    return xScale(Date.parse(d[3]));
+                })
+                .attr("cy", 305)
+                .attr("r", 1)
+                ;
+
+            // Comment Texts
+            svg.selectAll("text")
+                .data(data)
+                .enter()
+                .append("text")
+                .text(function(d) {
+                    var dateInfo = new Date(d[3]);
+                    var timeString = dateInfo.getHours() + ":" + dateInfo.getMinutes();
+                    return timeString + '　　' + d[2];
+                })
+                .attr("font-size", "10px")
+                .attr("fill", "#dddddd")
+                .attr("text-anchor", "start")
+                .attr("transform", function(d, i) {
+                    return "translate(" + xScale(Date.parse(d[3])) + ", 300), rotate(-45)";
+                })
+                .on("mouseover", function(d, i, obj) {
+                    d3.select(this)
+                        .attr("font-size", "15px")
+                        .attr("fill", "#000000")
+                        .attr("font-weight", "bold");
+                })
+                .on("mouseout", function() {
+                    d3.select(this)
+                        .attr("font-size", "10px")
+                        .attr("fill", "#dddddd")
+                        .attr("font-weight", "normal");
+                })
+                ;
+
+            // Bar Chart
+            svg.selectAll("rect")
+                .data(summedByMinutes)
+                .enter()
+                .append("rect")
+                .attr("width", 10)
+                .attr("height", function(d) {
+                    return yScale(d[1]);
+                })
+                .attr("x", function(d, i) {
+                    return xScale(new Date(d[0]));
+                })
+                .attr("y", 0)
+                .attr("transform", function(d) {
+                    return "translate(10, " + 305 + ")";
+                })
+                .attr("fill", function(d) {
+                    return colorScale(d[1]);
+                })
+                ;
+
+            /*********************************
+             * Setting Up Axises
+             *********************************/
+
+            var xAxis = d3.axisTop(xScale)
+                .ticks(15)
+                .tickSize(10);
+
+            var yAxis = d3.axisLeft(yScale)
+                .ticks(10)
+                .tickSize(5000)
+                ;
+
+            svg.append('g').call(xAxis)
+                .attr('transform', 'translate(0, 305)')
+                .attr('class', 'x-axis')
+                ;
+
+            svg.append('g').call(yAxis)
+                .attr('transform', 'translate(5020, 305)')
+                .attr('class', 'y-axis')
+                ;
+
+            /*********************************
+             * Add mouse wheel event listener
+             *********************************/
+
+            var domSvg = window.document.querySelector("svg");
+
+            domSvg.addEventListener("wheel", function(ev) {
+
+                var currentScale = xScale.range()[1];
+                if (xScale.range()[1] >= 1700) {
+                    xScale.range([0, currentScale + (ev.deltaY * 5)]);
+                    if (xScale.range()[1] < 1700) {
+                        xScale.range([0, 1700]);
+                    }
+                }
+
+                svg.selectAll("circle")
+                    .transition()
+                    .attr("cx", function(d, i) {
+                        return xScale(Date.parse(d[3]));
+                    });
+                svg.selectAll("text")
+                    .transition()
+                    .attr("transform", function(d, i) {
+                        return "translate(" + xScale(Date.parse(d[3])) + ", 300), rotate(-45)";
+                    });
+                svg.selectAll("rect")
+                    .transition()
+                    .attr("x", function(d, i) {
+                        return xScale(Date.parse(d[0]));
+                    })
+                    ;
+
+                xAxis.scale(xScale);
+
+                svg.select('g').transition().call(xAxis);
+
+                ev.preventDefault();
+            });
+
+
+            /*********************************
+             * Circle Version
+             *********************************/
+
+            // Scale as Angle
+/*
+            var circleScale = d3.scaleTime()
+                .domain([new Date(2017, 0, 20, 18, 0), new Date(2017, 0, 20, 20, 0)])
+                .range([0, 2*Math.PI*(moment(new Date(2017, 0, 20, 20, 0)).diff(new Date(2017, 0, 20, 18, 0), 'minutes')/60)])
+                ;
+
+            var svg_2 = d3.select("body")
+                .append("svg")
+                .attr("width", 1000)
+                .attr("height", 1200)
+                ;
+
+            svg_2.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                ;
+
+            var circles_2 = svg_2.selectAll("circle")
+                .attr("cx", function(d, i) {
+                    return 500+(100+32*circleScale(Date.parse(d[3])))*Math.sin(circleScale(Date.parse(d[3])));
+                })
+                .attr("cy", function(d, i) {
+                    return 500-(100+32*circleScale(Date.parse(d[3])))*Math.cos(circleScale(Date.parse(d[3])));
+                })
+                .attr("r", 1)
+                ;
+
+            svg_2.selectAll("rect")
+                .data(summedByMinutes)
+                .enter()
+                .append("rect")
+                .attr("width", 12)
+                .attr("height", function(d) {
+                    return yScale(d[1]);
+                })
+                .attr("transform", function(d, i) {
+                    return "translate(" + Math.floor(500+(100+32*circleScale(new Date(d[0])))*Math.sin(circleScale(new Date(d[0]))))
+                                        + ", " + Math.floor(500-(100+32*circleScale(new Date(d[0])))*Math.cos(circleScale(new Date(d[0]))))
+                                        + ") rotate(" + (360/(2*Math.PI)*(circleScale(new Date(d[0]))+Math.PI)-0) + ")";
+                })
+                .attr("fill", function(d) {
+                    return colorScale(d[1]);
+                })
+                ;
+*/
+
+        });
+    </script>
+</body>
+
+</html>
